@@ -358,6 +358,18 @@ unique_alleles <- distinct(unique_alleles)
 dim(unique_alleles)
 
 
+
+# Loop through each sequence in unique_alleles$asv
+amp_rev_comps<-c()
+
+for (seq in unique_alleles$asv) {
+  ok <- DNAString(seq)
+  rev_comp_seq <- as.character(reverseComplement(ok)) # Reverse complement the sequence
+  amp_rev_comps <- c(amp_rev_comps, rev_comp_seq)
+}
+
+unique_alleles$amp_reverse_compleemntary <- amp_rev_comps
+
 #get dna alignments
 aligned_amp_rev_comp<- c()
 aligned_amp_rev_comp_aln<- c()
@@ -375,9 +387,10 @@ for (amprevcomp in unique_alleles$amp_reverse_compleemntary){
 
 unique_alleles$aligned_amp_rev_comp <- aligned_amp_rev_comp
 
-#output full alignment just because
-full_alignment_concat <- DNAStringSet(c(k13_fasta_rev_comp, aligned_amp_rev_comp))
-names(full_alignment_concat)[2:87]<- unique_alleles$locus
 
-writeXStringSet(full_alignment_concat, "full_aligment_amplicons.fasta", format = "fasta")
+#output full alignment just because
+full_alignment_concat <- DNAStringSet(c(csp_ref, aligned_amp_rev_comp))
+names(full_alignment_concat)[2:length(full_alignment_concat)]<- unique_alleles$locus
+
+writeXStringSet(full_alignment_concat, "full_csp_aligment_amplicons.fasta", format = "fasta")
 
