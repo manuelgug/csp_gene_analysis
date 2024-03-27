@@ -358,7 +358,6 @@ unique_alleles <- distinct(unique_alleles)
 dim(unique_alleles)
 
 
-
 # Loop through each sequence in unique_alleles$asv
 amp_rev_comps<-c()
 
@@ -393,4 +392,84 @@ full_alignment_concat <- DNAStringSet(c(csp_ref, aligned_amp_rev_comp))
 names(full_alignment_concat)[2:length(full_alignment_concat)]<- unique_alleles$locus
 
 writeXStringSet(full_alignment_concat, "full_csp_aligment_amplicons.fasta", format = "fasta")
+
+
+# trim amplicons that are outside the csp gene 
+csp_length <- length(csp_ref$`PF3D7_0304600.1  | Plasmodium falciparum 3D7 | circumsporozoite (CS) protein | CDS | length=1194`)
+
+trim_string <- function(x, csp_length) {
+  if (nchar(x) > csp_length) {
+    return(substr(x, 1, csp_length))
+  } else {
+    return(x)
+  }
+}
+
+# Apply the function to each element
+unique_alleles$aligned_amp_rev_comp <- sapply(unique_alleles$aligned_amp_rev_comp, trim_string, csp_length)
+
+#check if length of sequences is the same now:
+if (length(unique(lapply(unique_alleles$aligned_amp_rev_comp, nchar))) == 1){
+  print("Amplicons have been successfully trimmed to the reference length")
+}else{
+  print("grab a coffee.")
+}
+
+
+######################################################################
+#------------------------   TRANSLATION    --------------------------#
+######################################################################
+
+# translate aligned amplicons (reverse compliment)
+getCodons <- function(myAln) {
+  seqs <- as.character(myAln)
+  len <- width(myAln)[1]
+  starts <- seq(from=1, to=len, by=3)
+  ends <- starts + 2
+  myViews <- lapply(myAln, function(x) { 
+    Views(x, starts, ends)
+  })
+  myCodons <- lapply(myViews, function(x) {
+    as.character(DNAStringSet(x))
+  })
+  myCodons
+}
+
+## translateCodons - takes a character vector of codons as input, outputs the corresponding amino acids
+translateCodons <- function(myCodons, unknownCodonTranslatesTo="-") {
+  ## make new genetic code
+  gapCodon <- "-"
+  names(gapCodon) <- "---"
+  my_GENETIC_CODE <- c(GENETIC_CODE, gapCodon)
+  
+  ## translate the codons
+  pep <- my_GENETIC_CODE[myCodons]
+  
+  ## check for codons that were not possible to translate, e.g. frameshift codons
+  if (sum(is.na(pep))>0) {
+    cat("\nwarning - there were codons I could not translate. Using this character", unknownCodonTranslatesTo, "\n\n")
+    pep[ which(is.na(pep)) ] <- unknownCodonTranslatesTo
+  }
+  
+  ## prep for output
+  pep <- paste(pep, collapse="")
+  return(pep)
+}
+
+## wrap the getCodons and translateCodons functions together into one:
+translateGappedAln <- function(myAln, unknownCodonTranslatesTo="-") {
+  myCodons <- getCodons(myAln)
+  myAAaln <- AAStringSet(unlist(lapply(myCodons, translateCodons, unknownCodonTranslatesTo=unknownCodonTranslatesTo)))
+  return(myAAaln)
+}
+
+#translate
+aas <- translateGappedAln(unique_alleles$aligned_amp_rev_comp, unknownCodonTranslatesTo="-") #change to x to see imcomplete codons if needed
+unique_alleles$translated_aligned_amp_rev_comp <- as.character(aas)
+
+#export aminoacid alignment just because
+writeXStringSet(aas, "full_csp_aligment_amplicons.faa", format = "fasta")
+
+
+
 
