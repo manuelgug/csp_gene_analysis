@@ -303,16 +303,14 @@ combined_df_merged <- combined_df_merged %>%
 combined_df_merged <- as.data.frame(combined_df_merged)
 
 
-## Keep only csp loci: c("Pf3D7_03_v3-221185-221419-1B", "Pf3D7_03_v3-221463-221712-1B", "Pf3D7_03_v3-221295-221532-2")
-
+## Keep only csp amplicons
 csp_amps <- c("Pf3D7_03_v3-221185-221419-1B", "Pf3D7_03_v3-221463-221712-1B", "Pf3D7_03_v3-221295-221532-2")
-
 combined_df_merged_csp <- combined_df_merged[combined_df_merged$locus %in% csp_amps,]
 
 #rename alleles
 combined_df_merged_csp$allele <- paste0(combined_df_merged_csp$locus, "_", combined_df_merged_csp$pseudo_cigar)
 
-# for cabo delgado
+# small edit for cabo delgado
 combined_df_merged_csp$province <- gsub(" ", "_", combined_df_merged_csp$province) 
 
 
@@ -321,9 +319,10 @@ SS <- length(unique(combined_df_merged_csp$NIDA2))
 cat("Final sample size is", as.character(SS))
 
 LC <- length(unique(combined_df_merged_csp$locus))
-cat("Loci count is", as.character(LC))
+cat("csp loci count is", as.character(LC))
 
-#save allele_data_list
+
+#save genomic db
 saveRDS(combined_df_merged_csp, "combined_df_merged_csp_only.RDS")
 
 
