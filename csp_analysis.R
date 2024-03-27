@@ -1,6 +1,8 @@
 
 library(ggplot2)
 library(dplyr)
+library(tidyr)
+library(Biostrings)
 
 
 ######################################################################
@@ -108,10 +110,9 @@ for (i in seq_along(allele_data_list)) {
   colnames(df)[1] <- "sample_id"
   
   df <- df %>% ### TEHERE IS A BUG WITH THE MASK THAT GENERATES MORE ALLELES THAN THERE REALLY ARE. THIS SNIPPET OF CODE COLLAPSES REPETITIONSAND SUMS THE READS AND FREQS. CRITICAL!!!
-    group_by(sample_id, locus, pseudo_cigar) %>%
+    group_by(sample_id, locus, pseudo_cigar, asv) %>%
     summarize(reads = sum(reads),
-              norm.reads.locus = sum(norm.reads.locus),
-              Category = first(Category)) %>%
+              norm.reads.locus = sum(norm.reads.locus)) %>%
     mutate(allele = paste(locus, ".", row_number(), sep = ""))
   
   
@@ -121,6 +122,7 @@ for (i in seq_along(allele_data_list)) {
 }
 
 names(allele_data_list) <- runs
+
 
 #get rid of replicate nidas keep the sample with the most reads across runs for each one of the replicates
 sum_reads <- function(df) {
@@ -187,13 +189,13 @@ filter_rows <- function(df) {
 # Apply the filter_rows function to each dataframe in allele_data_list
 allele_data_list <- lapply(allele_data_list, filter_rows)
 
-#visual check:
-for (df in allele_data_list) {
-  cat("sample size:", as.character(length(unique(df$sample_id))))
-  cat("\n")
-  print(unique(df$sample_id))
-  
-}
+# #visual check:
+# for (df in allele_data_list) {
+#   cat("sample size:", as.character(length(unique(df$sample_id))))
+#   cat("\n")
+#   print(unique(df$sample_id))
+#   
+# }
 
 #save allele_data_list
 saveRDS(allele_data_list, "allele_data_list.RDS")
@@ -227,11 +229,6 @@ combined_df_merged <- combined_df_merged[!combined_df_merged$NIDA2 %in% removed_
 
 
 #sanity check
-if (sum(is.na(combined_df_merged[, !colnames(combined_df_merged) %in% "seasonality"])) == 0) {
-  print("No NAs ✔")
-} else {
-  print("grab a coffee.")
-}
 
 if( sum(!(combined_df_merged$NIDA2 %in% db$NIDA2)) == 0){
   print("All nidas in combined_merged_df are also the metadata db. No weird samples ✔")
@@ -343,3 +340,44 @@ sample_size_regions <- combined_df_merged_csp %>%
   summarise(unique_NIDA2_count = n_distinct(NIDA2))
 
 sample_size_regions
+
+
+######################################################################
+#-----------------------     ALIGNMENT     --------------------------#
+######################################################################
+
+combined_df_merged_csp <- readRDS("combined_df_merged_csp_only.RDS")
+
+# csp reference gene (https://plasmodb.org/plasmo/app/record/gene/PF3D7_0304600#category:gene-structure):
+csp_ref <- readDNAStringSet("csp_plasmodb.fasta")
+
+
+#to avoid doing excessive amounts of alignment, perform only on unique alleles (goes from 3000+ to just 86!), fill table later
+unique_alleles <- combined_df_merged_csp[c("locus", "asv")]
+unique_alleles <- distinct(unique_alleles)
+dim(unique_alleles)
+
+
+#get dna alignments
+aligned_amp_rev_comp<- c()
+aligned_amp_rev_comp_aln<- c()
+
+for (amprevcomp in unique_alleles$amp_reverse_compleemntary){
+  
+  # Create example DNA sequences as a DNAStringSet
+  sequences <- DNAStringSet(c(csp_ref, amprevcomp))
+  
+  # Perform pairwise sequence alignment
+  alignment <- AlignSeqs(sequences)
+  
+  aligned_amp_rev_comp <- c(aligned_amp_rev_comp, as.character(alignment[2]))
+}
+
+unique_alleles$aligned_amp_rev_comp <- aligned_amp_rev_comp
+
+#output full alignment just because
+full_alignment_concat <- DNAStringSet(c(k13_fasta_rev_comp, aligned_amp_rev_comp))
+names(full_alignment_concat)[2:87]<- unique_alleles$locus
+
+writeXStringSet(full_alignment_concat, "full_aligment_amplicons.fasta", format = "fasta")
+
