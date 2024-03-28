@@ -3,6 +3,9 @@ library(ggplot2)
 library(dplyr)
 library(tidyr)
 library(Biostrings)
+library(progress)
+library(fs)
+library(DECIPHER)
 
 
 ######################################################################
@@ -471,5 +474,78 @@ unique_alleles$translated_aligned_amp_rev_comp <- as.character(aas)
 writeXStringSet(aas, "full_csp_aligment_amplicons.faa", format = "fasta")
 
 
+# identify all non-synonymous mutations on k13
+csp_ref_prot <- translate(csp_ref)
+aa_alignment <- c(csp_ref_prot, aas)
+
+aa_matrix <- matrix("", nrow = length(aa_alignment), ncol = width(aa_alignment[1]))
+dim(aa_matrix) #check: good
+
+# Fill the matrix character by character
+for (i in 1:length(aa_alignment)) {
+  current_seq <- as.character(aa_alignment[i])
+  
+  for (j in 1:nchar(current_seq)) {
+    aa_matrix[i, j] <- substr(current_seq, j, j)
+  }
+}
+
+aa_df <- as.data.frame(aa_matrix)
+colnames(aa_df) <- 1:ncol(aa_df)
+
+# Compare each sequence with the reference
+reference_seq_df <- aa_df[1,]
+aa_df <- aa_df[-1,]
+rownames(aa_df)<- c()
+
+nsym <- data.frame(rowname = character(), non_synonymous_codon = character(), stringsAsFactors = FALSE)
+
+for (i in 1:nrow(aa_df)) {
+  current_seq <- as.character(aa_df[i, ])
+  differences <- which(current_seq != reference_seq_df & (current_seq != "-" & current_seq != "X"))
+  
+  if (length(differences) > 0) {
+    nsym <- rbind(nsym, data.frame(rowname = rownames(aa_df)[i], non_synonymous_codon = differences))
+  } else {
+    nsym <- rbind(nsym, data.frame(rowname = rownames(aa_df)[i], non_synonymous_codon = NA))
+  }
+}
+
+nsym$ALT <- character(nrow(nsym))
+nsym$REF<- character(nrow(nsym))
+
+# Populate 'ALT' column based on the coordinates in nsym
+for (i in 1:nrow(nsym)) {
+  if (is.na(nsym$non_synonymous_codon[i])) {
+    nsym$ALT[i] <- NA
+  } else {
+    row_num <- as.numeric(nsym$rowname[i])
+    col_num <- as.numeric(nsym$non_synonymous_codon[i])
+    nsym$ALT[i] <- aa_df[row_num, col_num]
+  }
+}
+
+# Populate 'REF' column based on the coordinates in nsym
+for (i in 1:nrow(nsym)) {
+  if (!is.na(nsym$non_synonymous_codon[i])) {
+    row_num <- 1
+    col_num <- as.numeric(nsym$non_synonymous_codon[i])
+    nsym$REF[i] <- reference_seq_df[row_num, col_num]
+  } else {
+    
+  }
+}
+
+unique_alleles$rowname<- 1:length(rownames(unique_alleles))
+unique_alleles_complete <- merge(nsym, unique_alleles, by = "rowname", all.x = TRUE)
+unique_alleles_complete <- unique_alleles_complete[complete.cases(unique_alleles_complete$ALT), ] #removed NA rows (don't have a nsym mutation so not needed)
 
 
+# final csp allele_data formatting
+
+# Merge based on "locus" and "asv"
+merged_data <- merge(combined_df_merged_csp, unique_alleles_complete, by = c("locus", "asv"))
+
+FINAL_TABLE_sorted <- merged_data[order(merged_data$NIDA2, merged_data$locus, merged_data$pseudo_cigar), ]
+
+write.csv(FINAL_TABLE_sorted, "csp_nsym_mutations_FINAL.csv", row.names = F)
