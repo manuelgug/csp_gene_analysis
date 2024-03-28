@@ -86,8 +86,9 @@ write.csv(repeated_nidas_df, "repeated_nidas.csv", row.names = F)
 
 
 #######################################################
-# 2.- genomic data from all runs (allele data, resmarkers, haplos?)
+# 2.- genomic data from all runs
 #######################################################
+
 runs <- unique(paste0(result_df$NEW_run_id, "_RESULTS_v0.1.8_FILTERED"))
 
 folder_path <- paste0("../results_v0.1.8_RESMARKERS_FIX/", runs)
@@ -326,6 +327,7 @@ cat("csp loci count is", as.character(LC))
 saveRDS(combined_df_merged_csp, "combined_df_merged_csp_only.RDS")
 
 
+
 #######################################################
 # 4.- CHECK SAMPLE SIZES
 #######################################################
@@ -343,6 +345,7 @@ sample_size_regions <- combined_df_merged_csp %>%
   summarise(unique_NIDA2_count = n_distinct(NIDA2))
 
 sample_size_regions
+
 
 
 ######################################################################
@@ -419,6 +422,7 @@ if (length(unique(lapply(unique_alleles$aligned_amp_rev_comp, nchar))) == 1){
 }
 
 
+
 ######################################################################
 #------------------------   TRANSLATION    --------------------------#
 ######################################################################
@@ -474,7 +478,7 @@ unique_alleles$translated_aligned_amp_rev_comp <- as.character(aas)
 writeXStringSet(aas, "full_csp_aligment_amplicons.faa", format = "fasta")
 
 
-# identify all non-synonymous mutations on k13
+# identify all non-synonymous mutations 
 csp_ref_prot <- translate(csp_ref)
 aa_alignment <- c(csp_ref_prot, aas)
 
@@ -541,10 +545,13 @@ unique_alleles_complete <- merge(nsym, unique_alleles, by = "rowname", all.x = T
 unique_alleles_complete <- unique_alleles_complete[complete.cases(unique_alleles_complete$ALT), ] #removed NA rows (don't have a nsym mutation so not needed)
 
 
-# final csp allele_data formatting
+# Merge based on "locus" and "asv" 
+merged_data <- merge(combined_df_merged_csp, unique_alleles_complete, by = c("locus", "asv"), all = T) #all = T for including samples with only synonymous mutations. remove if needed. NA means no nsym mutations found.
 
-# Merge based on "locus" and "asv"
-merged_data <- merge(combined_df_merged_csp, unique_alleles_complete, by = c("locus", "asv"))
+
+######################################################################
+#---------------------   OUTPUT FORMATTING    -----------------------#
+######################################################################
 
 FINAL_TABLE_sorted <- merged_data[order(merged_data$NIDA2, merged_data$locus, merged_data$pseudo_cigar), ]
 
