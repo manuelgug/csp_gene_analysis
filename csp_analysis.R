@@ -548,4 +548,6 @@ merged_data <- merge(combined_df_merged_csp, unique_alleles_complete, by = c("lo
 
 FINAL_TABLE_sorted <- merged_data[order(merged_data$NIDA2, merged_data$locus, merged_data$pseudo_cigar), ]
 
+FINAL_TABLE_sorted <- FINAL_TABLE_sorted[c("NIDA2", "locus", "asv", "pseudo_cigar", "reads", "norm.reads.locus", "n.alleles", "non_synonymous_codon", "REF", "ALT", "region", "province")]
+
 write.csv(FINAL_TABLE_sorted, "csp_nsym_mutations_FINAL.csv", row.names = F)
