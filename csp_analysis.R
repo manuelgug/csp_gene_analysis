@@ -193,14 +193,6 @@ filter_rows <- function(df) {
 # Apply the filter_rows function to each dataframe in allele_data_list
 allele_data_list <- lapply(allele_data_list, filter_rows)
 
-# #visual check:
-# for (df in allele_data_list) {
-#   cat("sample size:", as.character(length(unique(df$sample_id))))
-#   cat("\n")
-#   print(unique(df$sample_id))
-#   
-# }
-
 #save allele_data_list
 saveRDS(allele_data_list, "allele_data_list.RDS")
 
@@ -233,7 +225,6 @@ combined_df_merged <- combined_df_merged[!combined_df_merged$NIDA2 %in% removed_
 
 
 #sanity check
-
 if( sum(!(combined_df_merged$NIDA2 %in% db$NIDA2)) == 0){
   print("All nidas in combined_merged_df are also the metadata db. No weird samples ✔")
 }else{
@@ -553,8 +544,11 @@ merged_data <- merge(combined_df_merged_csp, unique_alleles_complete, by = c("lo
 #---------------------   OUTPUT FORMATTING    -----------------------#
 ######################################################################
 
+#sort and subset final table
 FINAL_TABLE_sorted <- merged_data[order(merged_data$NIDA2, merged_data$locus, merged_data$pseudo_cigar), ]
-
 FINAL_TABLE_sorted <- FINAL_TABLE_sorted[c("NIDA2", "locus", "asv", "pseudo_cigar", "reads", "norm.reads.locus", "n.alleles", "non_synonymous_codon", "REF", "ALT", "region", "province")]
 
+FINAL_TABLE_sorted <- FINAL_TABLE_sorted[!is.na(FINAL_TABLE_sorted$non_synonymous_codon),]
+
+#output results
 write.csv(FINAL_TABLE_sorted, "csp_nsym_mutations_FINAL.csv", row.names = F)
