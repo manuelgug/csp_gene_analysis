@@ -2,11 +2,10 @@
 library(ggplot2)
 library(dplyr)
 library(tidyr)
-library(Biostrings)
+library(Biostrings) 
 library(progress)
 library(fs)
-library(DECIPHER)
-
+library(DECIPHER) 
 
 ######################################################################
 #-----------------------INPUT AND PREP DATA--------------------------#
@@ -16,7 +15,7 @@ library(DECIPHER)
 # 1.- metadata
 #######################################################
 
-db <- readxl::read_excel('HFS22_ID_run_list_csp_120324.xlsx')
+db <- readxl::read_excel('HFS22_ID_run_list_csp_030524.xlsx')
 colnames(db)[1]<- c("NIDA2")  #just to avoid changing variables in the script from Simone's analysis
 
 length(unique(db$NIDA2))
@@ -41,15 +40,15 @@ for (folder_path in dir_ls(path = directory_path, regexp = "_RESULTS_v0.1.8$")) 
   folder_name <- path_file(folder_path)
   file_path <- file.path(folder_path, "amplicon_coverage.txt")
   
-  cat("\n")
+  cat("/n")
   print(folder_name)
   
   # Read the contents of /quality_report/amplicon_stats.txt
   if (file.exists(file_path)) {
     sample_coverage_content <- readLines(file_path)
     
-    # Truncate each line after the first tab (\t) and return unique values and edit nida format to match the one from the db
-    truncated_values <- unique(sapply(strsplit(sample_coverage_content, "\t"), function(x) x[1]))
+    # Truncate each line after the first tab (/t) and return unique values and edit nida format to match the one from the db
+    truncated_values <- unique(sapply(strsplit(sample_coverage_content, "/t"), function(x) x[1]))
     truncated_values <- gsub("_S.*$", "", truncated_values)
     truncated_values <- gsub("_", ".", truncated_values)
     truncated_values <- gsub("-", ".", truncated_values)
@@ -82,7 +81,7 @@ length(repeated_nidas_df$NIDA2)
 length(unique(repeated_nidas_df$NIDA2))
 
 #ask team about these nidas
-write.csv(repeated_nidas_df, "repeated_nidas.csv", row.names = F)
+#write.csv(repeated_nidas_df, "repeated_nidas.csv", row.names = F)
 
 
 #######################################################
@@ -91,7 +90,7 @@ write.csv(repeated_nidas_df, "repeated_nidas.csv", row.names = F)
 
 runs <- unique(paste0(result_df$NEW_run_id, "_RESULTS_v0.1.8_FILTERED"))
 
-folder_path <- paste0("../results_v0.1.8_RESMARKERS_FIX/", runs)
+folder_path <- paste0("./", runs)
 allele_data_files <- file.path(folder_path, "allele_data_global_max_0_filtered.csv")
 
 # Import filtered allele data tables to the list
@@ -109,7 +108,7 @@ for (i in seq_along(allele_data_list)) {
   df$sampleID <- gsub("_", ".", df$sampleID)
   df$sampleID <- gsub("-", ".", df$sampleID)
   df$sampleID <- gsub("N", "", df$sampleID)
-  df$sampleID <- gsub("\\.0", "", df$sampleID)
+  df$sampleID <- gsub("//.0", "", df$sampleID)
   
   colnames(df)[1] <- "sample_id"
   
@@ -132,6 +131,7 @@ names(allele_data_list) <- runs
 sum_reads <- function(df) {
   aggregate(reads ~ sample_id, data = df, sum)
 }
+
 
 summed_reads <- lapply(allele_data_list, sum_reads)
 
@@ -184,14 +184,14 @@ if (dim(merged_df_dups)[1] == 0){
 }
 
 # Define a function to filter rows based on criteria: remove controls, basically
-filter_rows <- function(df) {
+#filter_rows <- function(df) {
   # Filter rows based on criteria
-  filtered_df <- df[!grepl("^[A-Za-z]|3D", df$sample_id), ]
-  return(filtered_df)
-}
+ # filtered_df <- df[!grepl("^[A-Za-z]|3D", df$sample_id), ]
+ # return(filtered_df)
+#}
 
 # Apply the filter_rows function to each dataframe in allele_data_list
-allele_data_list <- lapply(allele_data_list, filter_rows)
+#allele_data_list <- lapply(allele_data_list, filter_rows)
 
 #save allele_data_list
 saveRDS(allele_data_list, "allele_data_list.RDS")
@@ -237,6 +237,10 @@ if( sum(!(combined_df_merged$NIDA2 %in% db$NIDA2)) == 0){
 # 1) MAF filering (< 0.01)
 combined_df_merged <- combined_df_merged[combined_df_merged$norm.reads.locus  > 0.01, ]
 
+## Keep only csp amplicons
+csp_amps <- c("Pf3D7_03_v3-221185-221419-1B", "Pf3D7_03_v3-221463-221712-1B", "Pf3D7_03_v3-221295-221532-2")
+combined_df_merged_csp <- combined_df_merged[combined_df_merged$locus %in% csp_amps,]
+
 # 2) check for coverage (>100 loci with >threshold reads)
 # Define thresholds for read depth
 thresholds <- c(25, 50, 100, 200)
@@ -245,7 +249,7 @@ count_list <- list()
 # Loop over each threshold
 for (threshold in thresholds) {
   # Calculate unique loci counts for the current threshold
-  count <- combined_df_merged %>%
+  count <- combined_df_merged_csp %>%
     group_by(NIDA2, locus) %>%
     summarize(total_reads = sum(reads)) %>%
     group_by(NIDA2) %>%
@@ -257,24 +261,24 @@ for (threshold in thresholds) {
 
 result_df <- Reduce(function(x, y) left_join(x, y, by = "NIDA2"), count_list)
 
-#count cells above 100 for each column with the "unique" substring: here, i'm calculating the sample size for each reads count threshold using 100 loci as cutoff: samples with <100 read count per loci below the threshold should be removed
-count_above_100 <- function(x) sum(x >= 100, na.rm = TRUE)
+#count cells above 1 for each column with the "unique" substring: here, i'm calculating the sample size for each reads count threshold using 100 loci as cutoff: samples with <100 read count per loci below the threshold should be removed
+count_above_1 <- function(x) sum(x >= 1, na.rm = TRUE)
 unique_columns <- grep("unique", colnames(result_df), value = TRUE)
 
 count_results <- result_df %>%
-  summarise_at(vars(unique_columns), count_above_100)
+  summarise_at(vars(unique_columns), count_above_1)
 
 count_results
 
 # decided going with a threshold of >= 100 read depth,
-samples_to_keep <- result_df[result_df$unique_loci_100 >= 100, ]$NIDA2
+samples_to_keep <- result_df[result_df$unique_loci_100 >= 1, ]$NIDA2
 
-combined_df_merged <- combined_df_merged[combined_df_merged$NIDA2 %in% samples_to_keep, ]
+combined_df_merged_csp <- combined_df_merged_csp[combined_df_merged_csp$NIDA2 %in% samples_to_keep, ]
 
 
 # 3) remove bad loci: those that are not in at least 100 samples with a read depth of 100. 
 # Group by NIDA2 and locus, then summarize the total reads
-locus_read_depth <- combined_df_merged %>%
+locus_read_depth <- combined_df_merged_csp %>%
   group_by(NIDA2, locus) %>%
   summarize(read_depth = sum(reads))
 
@@ -285,19 +289,17 @@ locus_counts <- locus_read_depth %>%
 
 loci_to_keep <- locus_counts$locus
 
-combined_df_merged <- combined_df_merged[combined_df_merged$locus %in% loci_to_keep, ]
+
+combined_df_merged_csp <- combined_df_merged_csp[combined_df_merged_csp$locus %in% loci_to_keep, ]
 
 #recount n.alleles after filtering
-combined_df_merged <- combined_df_merged %>%
+combined_df_merged_csp <- combined_df_merged_csp %>%
   group_by(NIDA2, locus) %>%
   mutate(n.alleles = n_distinct(pseudo_cigar))
 
-combined_df_merged <- as.data.frame(combined_df_merged)
+combined_df_merged_csp <- as.data.frame(combined_df_merged_csp)
 
 
-## Keep only csp amplicons
-csp_amps <- c("Pf3D7_03_v3-221185-221419-1B", "Pf3D7_03_v3-221463-221712-1B", "Pf3D7_03_v3-221295-221532-2")
-combined_df_merged_csp <- combined_df_merged[combined_df_merged$locus %in% csp_amps,]
 
 #rename alleles
 combined_df_merged_csp$allele <- paste0(combined_df_merged_csp$locus, "_", combined_df_merged_csp$pseudo_cigar)
@@ -315,7 +317,7 @@ cat("csp loci count is", as.character(LC))
 
 
 #save genomic db
-saveRDS(combined_df_merged_csp, "combined_df_merged_csp_only.RDS")
+saveRDS(combined_df_merged_csp, "combined_df_merged_csp_only_testing.RDS")
 
 
 
@@ -323,7 +325,7 @@ saveRDS(combined_df_merged_csp, "combined_df_merged_csp_only.RDS")
 # 4.- CHECK SAMPLE SIZES
 #######################################################
 
-combined_df_merged_csp <- readRDS("combined_df_merged_csp_only.RDS")
+combined_df_merged_csp <- readRDS("combined_df_merged_csp_only_testing.RDS")
 
 sample_size_provinces <- combined_df_merged_csp %>%
   group_by(province) %>%
@@ -343,7 +345,7 @@ sample_size_regions
 #-----------------------     ALIGNMENT     --------------------------#
 ######################################################################
 
-combined_df_merged_csp <- readRDS("combined_df_merged_csp_only.RDS")
+combined_df_merged_csp <- readRDS("combined_df_merged_csp_only_testing.RDS")
 
 # csp reference gene (https://plasmodb.org/plasmo/app/record/gene/PF3D7_0304600#category:gene-structure):
 csp_ref <- readDNAStringSet("csp_plasmodb.fasta")
@@ -363,6 +365,7 @@ for (seq in unique_alleles$asv) {
   rev_comp_seq <- as.character(reverseComplement(ok)) # Reverse complement the sequence
   amp_rev_comps <- c(amp_rev_comps, rev_comp_seq)
 }
+
 
 unique_alleles$amp_reverse_compleemntary <- amp_rev_comps
 
@@ -386,9 +389,30 @@ unique_alleles$aligned_amp_rev_comp <- aligned_amp_rev_comp
 
 #output full alignment just because
 full_alignment_concat <- DNAStringSet(c(csp_ref, aligned_amp_rev_comp))
-names(full_alignment_concat)[2:length(full_alignment_concat)]<- unique_alleles$locus
 
-writeXStringSet(full_alignment_concat, "full_csp_aligment_amplicons.fasta", format = "fasta")
+
+# rename unique alleles
+counter <- 1
+
+modified_names <- character(length(unique_alleles$locus))
+
+for (unique_element in unique(unique_alleles$locus)) {
+  indices <- which(unique_alleles$locus == unique_element)
+  modified_names[indices] <- paste0("HAP_", counter:(counter + length(indices) - 1), "_", unique_element) #puedes cambiar HAP_ por el prefijo que quieras
+  counter <- counter + length(indices)
+}
+
+# Replace loci names
+modified_names <- gsub("Pf3D7_03_v3-221185-221419-1B", "amp1", modified_names)
+modified_names <- gsub("Pf3D7_03_v3-221295-221532-2", "amp2", modified_names)
+modified_names <- gsub("Pf3D7_03_v3-221463-221712-1B", "amp3", modified_names)
+
+unique_alleles$hap_name <- modified_names
+
+names(full_alignment_concat)[2:length(full_alignment_concat)]<- unique_alleles$hap_name
+
+
+writeXStringSet(full_alignment_concat, "full_csp_aligment_Dd2_test1K.fasta", format = "fasta")
 
 
 # trim amplicons that are outside the csp gene 
@@ -445,7 +469,7 @@ translateCodons <- function(myCodons, unknownCodonTranslatesTo="-") {
   
   ## check for codons that were not possible to translate, e.g. frameshift codons
   if (sum(is.na(pep))>0) {
-    cat("\nwarning - there were codons I could not translate. Using this character", unknownCodonTranslatesTo, "\n\n")
+    cat("/nwarning - there were codons I could not translate. Using this character", unknownCodonTranslatesTo, "/n/n")
     pep[ which(is.na(pep)) ] <- unknownCodonTranslatesTo
   }
   
@@ -465,13 +489,15 @@ translateGappedAln <- function(myAln, unknownCodonTranslatesTo="-") {
 aas <- translateGappedAln(unique_alleles$aligned_amp_rev_comp, unknownCodonTranslatesTo="-") #change to x to see imcomplete codons if needed
 unique_alleles$translated_aligned_amp_rev_comp <- as.character(aas)
 
-#export aminoacid alignment just because
-writeXStringSet(aas, "full_csp_aligment_amplicons.faa", format = "fasta")
-
-
 # identify all non-synonymous mutations 
 csp_ref_prot <- translate(csp_ref)
 aa_alignment <- c(csp_ref_prot, aas)
+
+#rename seqs
+names(aa_alignment)[2:length(aa_alignment)]<- unique_alleles$hap_name
+
+#export aminoacid alignment WITH REFERENCE! just because
+writeXStringSet(aa_alignment, "full_csp_aligment_Dd2_test1K.faa", format = "fasta")
 
 aa_matrix <- matrix("", nrow = length(aa_alignment), ncol = width(aa_alignment[1]))
 dim(aa_matrix) #check: good
@@ -533,7 +559,30 @@ for (i in 1:nrow(nsym)) {
 
 unique_alleles$rowname<- 1:length(rownames(unique_alleles))
 unique_alleles_complete <- merge(nsym, unique_alleles, by = "rowname", all.x = TRUE)
-unique_alleles_complete <- unique_alleles_complete[complete.cases(unique_alleles_complete$ALT), ] #removed NA rows (don't have a nsym mutation so not needed)
+
+#unique_alleles_complete <- unique_alleles_complete[complete.cases(unique_alleles_complete$ALT), ] #removed NA rows (don't have a nsym mutation so not needed)
+
+#keep reference sequence for calcualting allele freqs later.
+# Replace NAs and blank values with "WT"
+unique_alleles_complete <- unique_alleles_complete %>%
+  mutate_all(~replace(., is.na(.) | . == "", "WT"))
+
+# Identify rows where both `asv` and `hap_name` are "WT"
+wt_rows <- unique_alleles_complete %>%
+  filter(REF == "WT" & ALT == "WT")
+
+# Keep only one "WT" row per unique `locus`
+wt_rows_filtered <- wt_rows %>%
+  group_by(locus) %>%
+  filter(row_number()==1)
+  ungroup()
+
+# Non-"WT" rows
+non_wt_rows <- unique_alleles_complete %>%
+  filter(!(REF == "WT" & ALT == "WT"))
+
+# Combine the filtered "WT" rows with the non-"WT" rows
+unique_alleles_complete <- bind_rows(wt_rows_filtered, non_wt_rows)
 
 
 # Merge based on "locus" and "asv" 
@@ -546,9 +595,10 @@ merged_data <- merge(combined_df_merged_csp, unique_alleles_complete, by = c("lo
 
 #sort and subset final table
 FINAL_TABLE_sorted <- merged_data[order(merged_data$NIDA2, merged_data$locus, merged_data$pseudo_cigar), ]
-FINAL_TABLE_sorted <- FINAL_TABLE_sorted[c("NIDA2", "locus", "asv", "pseudo_cigar", "reads", "norm.reads.locus", "n.alleles", "non_synonymous_codon", "REF", "ALT", "region", "province")]
+FINAL_TABLE_sorted <- FINAL_TABLE_sorted[c("NIDA2", "locus", "allele", "asv", "pseudo_cigar", "reads", "norm.reads.locus", "n.alleles", "non_synonymous_codon", "REF", "ALT", "region", "province", "hap_name")]
 
 FINAL_TABLE_sorted <- FINAL_TABLE_sorted[!is.na(FINAL_TABLE_sorted$non_synonymous_codon),]
 
 #output results
-write.csv(FINAL_TABLE_sorted, "csp_nsym_mutations_FINAL.csv", row.names = F)
+write.csv(FINAL_TABLE_sorted, "csp_nsym_mutations_Dd2_Test1K.csv", row.names = F)
+
